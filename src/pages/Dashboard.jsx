@@ -55,11 +55,7 @@ const Dashboard = () => {
   };
 
 
-  useEffect(() => {
-    if (selectedFeature) {
-      loadData();
-    }
-  }, [selectedFeature]);
+
 
   return (
     <div className="min-h-screen bg-gray-50">
