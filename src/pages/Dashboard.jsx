@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../redux/authSlice';
@@ -17,35 +17,26 @@ const Dashboard = () => {
 
   const [refreshing, setRefreshing] = useState(false);
 
+
+
+  const loadData = useCallback(async () => {
+    const params = {};
+  
+    if (filters.startDate) params.startDate = filters.startDate;
+    if (filters.endDate) params.endDate = filters.endDate;
+    if (filters.age && filters.age !== 'All') params.age = filters.age;
+    if (filters.gender && filters.gender !== 'All') params.gender = filters.gender;
+    if (selectedFeature) params.feature = selectedFeature;
+  
+    await dispatch(fetchAnalyticsData(params));
+  }, [filters, selectedFeature, dispatch]);
+
+
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
-  const loadData = async () => {
-    const params = {};
-    
-    if (filters.startDate) {
-      params.startDate = filters.startDate;
-    }
-    
-    if (filters.endDate) {
-      params.endDate = filters.endDate;
-    }
-    
-    if (filters.age && filters.age !== 'All') {
-      params.age = filters.age;
-    }
-    
-    if (filters.gender && filters.gender !== 'All') {
-      params.gender = filters.gender;
-    }
-    
-    if (selectedFeature) {
-      params.feature = selectedFeature;
-    }
 
-    await dispatch(fetchAnalyticsData(params));
-  };
 
   const handleFilterChange = () => {
     loadData();
@@ -62,6 +53,7 @@ const Dashboard = () => {
     dispatch(logout());
     navigate('/login');
   };
+
 
   useEffect(() => {
     if (selectedFeature) {
