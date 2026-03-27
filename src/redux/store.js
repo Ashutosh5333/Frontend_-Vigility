@@ -9,8 +9,16 @@ export const store = configureStore({
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      serializableCheck: false,
+      serializableCheck: {
+        // Ignore these action types
+        ignoredActions: ['analytics/setFilters'],
+        // Ignore these field paths in all actions
+        ignoredActionPaths: ['payload.timestamp'],
+        // Ignore these paths in the state
+        ignoredPaths: ['analytics.lastFetched'],
+      },
     }),
+  devTools: process.env.NODE_ENV !== 'production',
 });
 
 export default store;

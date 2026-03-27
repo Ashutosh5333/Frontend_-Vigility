@@ -1,211 +1,221 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { logout } from '../redux/authSlice';
-import { fetchAnalyticsData, trackFeature } from '../redux/analyticsSlice';
-import Filters from '../components/Filters';
-import BarChart from '../components/BarChart';
-import LineChart from '../components/LineChart';
+import { Toaster, toast } from 'react-hot-toast';
+import { 
+  HiChartBar, 
+  HiCursorClick, 
+  HiLightningBolt 
+} from 'react-icons/hi';
+import {
+  fetchAnalyticsData,
+  selectFeatureClicks,
+  selectTimeTrend,
+  selectFilters,
+  selectSelectedFeature,
+  selectAnalyticsLoading,
+  selectTotalClicks,
+  selectTotalFeatures,
+} from '../redux/analyticsSlice';
+
+import { TOAST_MESSAGES } from '../constants';
+import DashboardHeader from '../components/dashboard/DashboardHeader';
+import StatsCard from '../components/dashboard/StatsCard';
+import Filters from '../components/filters/Filters';
+import BarChart from '../components/charts/BarChart';
+import LineChart from '../components/charts/LineChart';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 const Dashboard = () => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const { user } = useSelector((state) => state.auth);
-  const { featureClicks, timeTrend, loading, filters, selectedFeature } = useSelector(
-    (state) => state.analytics
-  );
-
-  const [refreshing, setRefreshing] = useState(false);
-
-
-
-  const loadData = useCallback(async () => {
+  const featureClicks = useSelector(selectFeatureClicks);
+  const timeTrend = useSelector(selectTimeTrend);
+  const filters = useSelector(selectFilters);
+  const selectedFeature = useSelector(selectSelectedFeature);
+  const loading = useSelector(selectAnalyticsLoading);
+  const totalClicks = useSelector(selectTotalClicks);
+  const totalFeatures = useSelector(selectTotalFeatures);
+  
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
+  
+  // Memoized API params to prevent unnecessary re-renders
+  const apiParams = useMemo(() => {
     const params = {};
+    
+    if (filters.startDate) {
+      params.startDate = filters.startDate;
+    }
+    
+    if (filters.endDate) {
+      params.endDate = filters.endDate;
+    }
+    
+    if (filters.age && filters.age !== 'All') {
+      params.age = filters.age;
+    }
+    
+    if (filters.gender && filters.gender !== 'All') {
+      params.gender = filters.gender;
+    }
+    
+    if (selectedFeature) {
+      params.feature = selectedFeature;
+    }
+    
+    return params;
+  }, [filters, selectedFeature]);
   
-    if (filters.startDate) params.startDate = filters.startDate;
-    if (filters.endDate) params.endDate = filters.endDate;
-    if (filters.age && filters.age !== 'All') params.age = filters.age;
-    if (filters.gender && filters.gender !== 'All') params.gender = filters.gender;
-    if (selectedFeature) params.feature = selectedFeature;
+  // Load data function
+  const loadData = useCallback(async () => {
+    try {
+      await dispatch(fetchAnalyticsData(apiParams)).unwrap();
+      if (!initialLoad) {
+        toast.success(TOAST_MESSAGES.DATA_REFRESH_SUCCESS);
+      }
+    } catch (error) {
+      toast.error('Failed to load analytics data');
+    } finally {
+      setInitialLoad(false);
+    }
+  }, [dispatch, apiParams,initialLoad]);
   
-    await dispatch(fetchAnalyticsData(params));
-  }, [filters, selectedFeature, dispatch]);
-
-
+  // Initial load
   useEffect(() => {
     loadData();
   }, [loadData]);
+  
+  
+  useEffect(() => {
+    if (!initialLoad) {
+      loadData();
+    }
+  }, [apiParams, initialLoad, loadData]);
 
-
-
-  const handleFilterChange = () => {
-    loadData();
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    dispatch(trackFeature('refresh_button'));
+  // Handle refresh button
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
     await loadData();
-    setTimeout(() => setRefreshing(false), 500);
-  };
-
-  const handleLogout = () => {
-    dispatch(logout());
-    navigate('/login');
-  };
-
-
-
-
+    setTimeout(() => setIsRefreshing(false), 500);
+  }, [loadData]);
+  
+  // Handle filter changes
+  const handleFilterChange = useCallback(() => {
+    // Filter changes trigger re-render via useEffect on apiParams
+  }, []);
+  
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Analytics Dashboard
-              </h1>
-              <p className="text-sm text-gray-600 mt-1">
-                Welcome back, <span className="font-medium">{user?.username}</span>
-              </p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <svg
-                  className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-                {refreshing ? 'Refreshing...' : 'Refresh'}
-              </button>
-              <button
-                onClick={handleLogout}
-                className="flex items-center px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-              >
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                  />
-                </svg>
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#fff',
+            color: '#374151',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+            borderRadius: '0.75rem',
+            padding: '1rem',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
+      
+      <DashboardHeader 
+        onRefresh={handleRefresh} 
+        isRefreshing={isRefreshing} 
+      />
+      
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Filters */}
         <Filters onFilterChange={handleFilterChange} />
-
+        
         {/* Loading State */}
-        {loading && (
-          <div className="flex justify-center items-center py-12">
-            <div className="text-center">
-              <svg
-                className="animate-spin h-12 w-12 text-primary-600 mx-auto"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              <p className="mt-4 text-gray-600">Loading analytics data...</p>
-            </div>
-          </div>
-        )}
-
-        {/* Charts */}
-        {!loading && (
-          <div className="space-y-6">
-            {/* Bar Chart */}
-            <BarChart data={featureClicks} selectedFeature={selectedFeature} />
-
-            {/* Line Chart */}
-            <LineChart data={timeTrend} selectedFeature={selectedFeature} />
-
-            {/* Stats Summary */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                Summary Statistics
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <p className="text-sm text-blue-600 font-medium">
-                    Total Features Tracked
-                  </p>
-                  <p className="text-2xl font-bold text-blue-900 mt-1">
-                    {featureClicks.length}
-                  </p>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <p className="text-sm text-green-600 font-medium">
-                    Total Clicks
-                  </p>
-                  <p className="text-2xl font-bold text-green-900 mt-1">
-                    {featureClicks.reduce(
-                      (sum, item) => sum + parseInt(item.click_count),
-                      0
-                    )}
-                  </p>
-                </div>
-                <div className="bg-purple-50 p-4 rounded-lg">
-                  <p className="text-sm text-purple-600 font-medium">
-                    Selected Feature
-                  </p>
-                  <p className="text-2xl font-bold text-purple-900 mt-1 truncate">
-                    {selectedFeature || 'None'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+        {loading && initialLoad ? (
+          <LoadingSpinner size="lg" text="Loading analytics data..." />
+        ) : (
+          <>
+            {/* Stats Cards */}
+            <motion.div
+              className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+            >
+              <StatsCard
+                title="Total Features Tracked"
+                value={totalFeatures.toLocaleString()}
+                icon={HiChartBar}
+                color="blue"
+                delay={0.1}
+              />
+              
+              <StatsCard
+                title="Total Clicks"
+                value={totalClicks.toLocaleString()}
+                icon={HiCursorClick}
+                color="green"
+                delay={0.2}
+              />
+              
+              <StatsCard
+                title="Selected Feature"
+                value={selectedFeature ? selectedFeature.replace(/_/g, ' ') : 'None'}
+                icon={HiLightningBolt}
+                color="purple"
+                delay={0.3}
+              />
+            </motion.div>
+            
+            {/* Charts */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              <BarChart 
+                data={featureClicks} 
+                selectedFeature={selectedFeature} 
+              />
+              
+              <LineChart 
+                data={timeTrend} 
+                selectedFeature={selectedFeature} 
+              />
+            </motion.div>
+          </>
         )}
       </main>
-
+      
       {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 mt-12">
+      <motion.footer
+        className="bg-white border-t border-gray-200 mt-12"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.5 }}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <p className="text-center text-sm text-gray-500">
-            Interactive Product Analytics Dashboard - Vigility Technologies Challenge
-          </p>
+          <div className="text-center">
+            <p className="text-sm text-gray-500">
+              Interactive Product Analytics Dashboard
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              Built with React, Redux, Tailwind CSS & Chart.js
+            </p>
+          </div>
         </div>
-      </footer>
+      </motion.footer>
     </div>
   );
 };

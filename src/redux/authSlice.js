@@ -1,21 +1,22 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { authAPI } from '../api/api';
+import { authService } from '../services/api.service';
+import { STORAGE_KEYS } from '../constants';
 
-// Load user from localStorage
-const loadUser = () => {
+// Helper to load user from localStorage
+const loadStoredAuth = () => {
   try {
-    const user = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
-    return user && token ? { user: JSON.parse(user), token } : { user: null, token: null };
-  } catch (error) {
-    return { user: null, token: null };
+    const user = localStorage.getItem(STORAGE_KEYS.USER);
+    const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+    return user && token 
+      ? { user: JSON.parse(user), token, isAuthenticated: true } 
+      : { user: null, token: null, isAuthenticated: false };
+  } catch {
+    return { user: null, token: null, isAuthenticated: false };
   }
 };
 
 const initialState = {
-  user: loadUser().user,
-  token: loadUser().token,
-  isAuthenticated: !!loadUser().token,
+  ...loadStoredAuth(),
   loading: false,
   error: null,
 };
@@ -25,7 +26,7 @@ export const register = createAsyncThunk(
   'auth/register',
   async (userData, { rejectWithValue }) => {
     try {
-      const response = await authAPI.register(userData);
+      const response = await authService.register(userData);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -39,7 +40,7 @@ export const login = createAsyncThunk(
   'auth/login',
   async (credentials, { rejectWithValue }) => {
     try {
-      const response = await authAPI.login(credentials);
+      const response = await authService.login(credentials);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -57,8 +58,8 @@ const authSlice = createSlice({
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
+      localStorage.removeItem(STORAGE_KEYS.USER);
+      localStorage.removeItem(STORAGE_KEYS.TOKEN);
     },
     clearError: (state) => {
       state.error = null;
@@ -76,8 +77,8 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.token = action.payload.token;
         state.isAuthenticated = true;
-        localStorage.setItem('user', JSON.stringify(action.payload.user));
-        localStorage.setItem('token', action.payload.token);
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(action.payload.user));
+        localStorage.setItem(STORAGE_KEYS.TOKEN, action.payload.token);
       })
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
@@ -93,8 +94,8 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.token = action.payload.token;
         state.isAuthenticated = true;
-        localStorage.setItem('user', JSON.stringify(action.payload.user));
-        localStorage.setItem('token', action.payload.token);
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(action.payload.user));
+        localStorage.setItem(STORAGE_KEYS.TOKEN, action.payload.token);
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
@@ -104,4 +105,12 @@ const authSlice = createSlice({
 });
 
 export const { logout, clearError } = authSlice.actions;
+
+// Memoized selectors
+export const selectAuth = (state) => state.auth;
+export const selectUser = (state) => state.auth.user;
+export const selectIsAuthenticated = (state) => state.auth.isAuthenticated;
+export const selectAuthLoading = (state) => state.auth.loading;
+export const selectAuthError = (state) => state.auth.error;
+
 export default authSlice.reducer;

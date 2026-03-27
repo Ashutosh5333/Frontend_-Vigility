@@ -1,7 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
-import { register, clearError } from '../redux/authSlice';
+import { toast } from 'react-hot-toast';
+import { HiUser, HiLockClosed } from 'react-icons/hi';
+import { 
+  register, 
+  clearError, 
+  selectIsAuthenticated, 
+  selectAuthLoading, 
+  selectAuthError 
+} from '../redux/authSlice';
+import { validateRegistrationForm } from '../utils/validation';
+import { ROUTES, TOAST_MESSAGES, GENDER_OPTIONS } from '../constants';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
+import Button from '../components/ui/Button';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -11,194 +25,167 @@ const Register = () => {
     age: '',
     gender: 'Male',
   });
-
-  const [validationError, setValidationError] = useState('');
-
+  const [errors, setErrors] = useState({});
+  
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loading, error, isAuthenticated } = useSelector((state) => state.auth);
-
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const loading = useSelector(selectAuthLoading);
+  const error = useSelector(selectAuthError);
+  
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard');
+      toast.success(TOAST_MESSAGES.REGISTER_SUCCESS);
+      navigate(ROUTES.DASHBOARD);
     }
   }, [isAuthenticated, navigate]);
-
+  
   useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
     return () => {
       dispatch(clearError());
     };
-  }, [dispatch]);
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-    setValidationError('');
-  };
-
-  const handleSubmit = async (e) => {
+  }, [error, dispatch]);
+  
+  const handleChange = useCallback((e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    // Clear error for this field
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: null }));
+    }
+  }, [errors]);
+  
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
-    setValidationError('');
-
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
-      setValidationError('Passwords do not match');
+    
+    const validation = validateRegistrationForm(formData);
+    if (!validation.isValid) {
+      setErrors(validation.errors);
       return;
     }
-
-    if (formData.password.length < 6) {
-      setValidationError('Password must be at least 6 characters long');
-      return;
-    }
-
-    if (formData.age < 1 || formData.age > 120) {
-      setValidationError('Age must be between 1 and 120');
-      return;
-    }
-
+    
     const { confirmPassword, ...registerData } = formData;
     registerData.age = parseInt(registerData.age);
-
+    
     dispatch(register(registerData));
-  };
-
+  }, [formData, dispatch]);
+  
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 py-12">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-2xl">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 px-4 py-12">
+      <motion.div
+        className="max-w-md w-full"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        {/* Logo/Title Card */}
+        <motion.div
+          className="text-center mb-8"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+        >
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 rounded-2xl mb-4 shadow-lg">
+            <HiUser className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-purple-600 bg-clip-text text-transparent">
             Create Account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Join the Analytics Dashboard
-          </p>
-        </div>
-
-        {(error || validationError) && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg relative">
-            <span className="block sm:inline">{error || validationError}</span>
-          </div>
-        )}
-
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm space-y-4">
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
-                Username
-              </label>
-              <input
-                id="username"
-                name="username"
-                type="text"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="Choose a username"
-                value={formData.username}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="Create a password"
-                value={formData.password}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm Password
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="Confirm your password"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="age" className="block text-sm font-medium text-gray-700 mb-1">
-                Age
-              </label>
-              <input
-                id="age"
+          <p className="text-gray-600 mt-2">Join the Analytics Dashboard</p>
+        </motion.div>
+        
+        {/* Register Form Card */}
+        <motion.div
+          className="bg-white rounded-2xl shadow-strong p-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <Input
+              label="Username"
+              name="username"
+              type="text"
+              placeholder="Choose a username"
+              value={formData.username}
+              onChange={handleChange}
+              error={errors.username}
+              icon={HiUser}
+              autoFocus
+            />
+            
+            <Input
+              label="Password"
+              name="password"
+              type="password"
+              placeholder="Create a password"
+              value={formData.password}
+              onChange={handleChange}
+              error={errors.password}
+              icon={HiLockClosed}
+            />
+            
+            <Input
+              label="Confirm Password"
+              name="confirmPassword"
+              type="password"
+              placeholder="Confirm your password"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              error={errors.confirmPassword}
+              icon={HiLockClosed}
+            />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Age"
                 name="age"
                 type="number"
-                required
-                min="1"
-                max="120"
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="Enter your age"
+                placeholder="Your age"
                 value={formData.age}
                 onChange={handleChange}
+                error={errors.age}
+                min="1"
+                max="120"
               />
-            </div>
-
-            <div>
-              <label htmlFor="gender" className="block text-sm font-medium text-gray-700 mb-1">
-                Gender
-              </label>
-              <select
-                id="gender"
+              
+              <Select
+                label="Gender"
                 name="gender"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                options={GENDER_OPTIONS.filter(opt => opt.value !== 'All')}
                 value={formData.gender}
                 onChange={handleChange}
-              >
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
+                error={errors.gender}
+              />
             </div>
-          </div>
-
-          <div>
-            <button
+            
+            <Button
               type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={loading}
             >
-              {loading ? (
-                <span className="flex items-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Creating account...
-                </span>
-              ) : (
-                'Create Account'
-              )}
-            </button>
-          </div>
-
-          <div className="text-center">
+              Create Account
+            </Button>
+          </form>
+          
+          <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{' '}
-              <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500 transition-colors">
+              <Link 
+                to={ROUTES.LOGIN} 
+                className="font-semibold text-primary-600 hover:text-primary-700 transition-colors"
+              >
                 Sign in
               </Link>
             </p>
           </div>
-        </form>
-      </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 };
