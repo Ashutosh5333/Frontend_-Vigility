@@ -139,7 +139,7 @@ cp .env.example .env
 
 Edit `.env`:
 ```env
-REACT_APP_API_URL=http://localhost:5000/api
+REACT_APP_API_URL=http://localhost:5001/api
 ```
 
 ### Step 3: Start Development Server
